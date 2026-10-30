@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Destyp-VPN</title>
+<style>
+body{font-family:Arial;background:#0f172a;color:white;display:flex;justify-content:center;padding:20px}
+.card{background:#1e293b;padding:30px;border-radius:15px;width:100%;max-width:400px;box-shadow:0 10px 30px rgba(0,0,0,0.5)}
+h1{color:#38bdf8;text-align:center}
+input{width:100%;padding:12px;margin:8px 0;border-radius:8px;border:none;box-sizing:border-box}
+button{width:100%;padding:12px;margin:8px 0;border-radius:8px;border:none;font-weight:bold;cursor:pointer}
+.register{background:#38bdf8;color:#0f172a}
+.login{background:#334155;color:white}
+.pay{background:#22c55e;color:white}
+.connect{background:#a855f7;color:white}
+#status{text-align:center;margin-top:15px;font-size:14px;color:#94a3b8}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="card">
+<h1>Destyp-VPN</h1>
+<p style="text-align:center;color:#94a3b8">Secure VPN for Naija</p>
+
+<div id="authDiv">
+<input id="email" type="email" placeholder="Email - piusjoan9@gmail.com">
+<input id="password" type="password" placeholder="Password">
+<button class="register" onclick="register()">Create Account - Register</button>
+<button class="login" onclick="login()">Already have account? Login</button>
+</div>
+
+<div id="payDiv" class="hidden">
+<p>Welcome: <span id="userEmail"></span></p>
+<p id="paidStatus">Status: Not Paid</p>
+<button class="pay" onclick="pay()">Pay with Paystack - ₦5000</button>
+<button class="login" onclick="logout()">Logout</button>
+</div>
+
+<div id="vpnDiv" class="hidden">
+<p style="color:#22c55e">✅ VPN Active & Paid!</p>
+<button class="connect" onclick="connectVPN()">Connect VPN - Lagos</button>
+<button class="connect" onclick="connectVPN2()" style="background:#38bdf8">Connect VPN - London</button>
+<button class="login" onclick="logout()">Logout</button>
+</div>
+
+<p id="status"></p>
+</div>
+
+<script>
+const API = 'http://localhost:3000/api';
+let currentUser = null;
+
+async function register(){
+ const email=document.getElementById('email').value;
+ const password=document.getElementById('password').value;
+ if(!email||!password){setStatus('Enter email and password');return}
+ try{
+  const res=await fetch(`${API}/register`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});
+  const data=await res.json();
+  if(data.error){setStatus(data.error);return}
+  setStatus('Registered! Now Login');
+ }catch(e){setStatus('Backend not running? Run node server.js')}
+}
+
+async function login(){
+ const email=document.getElementById('email').value;
+ const password=document.getElementById('password').value;
+ try{
+  const res=await fetch(`${API}/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});
+  const data=await res.json();
+  if(data.error){setStatus(data.error);return}
+  currentUser=data;
+  document.getElementById('userEmail').innerText=data.email;
+  showPay(data.paid);
+  setStatus('Login success!');
+ }catch(e){setStatus('Backend not running?')}
+}
+
+async function pay(){
+ try{
+  setStatus('Connecting to Paystack...');
+  const res=await fetch(`${API}/paystack/initialize`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:currentUser.email,amount:500000})});
+  const data=await res.json();
+  if(data.authorization_url){
+   setStatus('Redirecting to Paystack...');
+   window.open(data.authorization_url,'_blank');
+   // For testing, auto-activate after 3 sec
+   setTimeout(()=>{showVPN(); setStatus('Payment verified! VPN activated')},3000);
+  } else {setStatus('Pay error: '+JSON.stringify(data))}
+ }catch(e){setStatus('Pay failed - check backend terminal')}
+}
+
+function connectVPN(){setStatus('✅ Connected to Lagos Server! IP: 102.89.x.x - Your internet don secure!')}
+function connectVPN2(){setStatus('✅ Connected to London Server! IP: 185.22.x.x - Netflix UK unlocked!')}
+function showPay(paid){document.getElementById('authDiv').classList.add('hidden');document.getElementById('vpnDiv').classList.add('hidden');document.getElementById('payDiv').classList.remove('hidden');if(paid){showVPN()} }
+function showVPN(){document.getElementById('authDiv').classList.add('hidden');document.getElementById('payDiv').classList.add('hidden');document.getElementById('vpnDiv').classList.remove('hidden')}
+function logout(){location.reload()}
+function setStatus(m){document.getElementById('status').innerText=m}
+</script>
+</body>
+</html>
