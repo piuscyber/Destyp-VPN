@@ -48,7 +48,7 @@ button{width:100%;padding:12px;margin:8px 0;border-radius:8px;border:none;font-w
 </div>
 
 <script>
-const API = 'http://localhost:3000/api';
+   const API = 'https://destyp-vpn.onrender.com/api';
 let currentUser = null;
 
 async function register(){
@@ -71,7 +71,7 @@ async function login(){
   const data=await res.json();
   if(data.error){setStatus(data.error);return}
   currentUser=data;
-  document.getElementById('userEmail').innerText=data.email;
+  document.getElementById('userEmail').innerText = email;
   showPay(data.paid);
   setStatus('Login success!');
  }catch(e){setStatus('Backend not running?')}

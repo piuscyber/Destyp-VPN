@@ -1,26 +1,31 @@
-require('dotenv').config();
 const express = require('express');
-const cors = require('cors');
 const axios = require('axios');
+const cors = require('cors');
+const fs = require('fs');
+require('dotenv').config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Simple storage for now (later we go use database)
+// Simple database file so Paid no go disappear after restart
+const DB_FILE = './users.json';
 let users = [];
-
-app.get('/api/servers', (req, res) => {
-  res.json([{name:'Lagos', id:1},{name:'London', id:2}]);
-});
+if (fs.existsSync(DB_FILE)) {
+  users = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+}
+function saveUsers() {
+  fs.writeFileSync(DB_FILE, JSON.stringify(users, null, 2));
+}
 
 // REGISTER
 app.post('/api/register', (req, res) => {
   const { email, password } = req.body;
   if (users.find(u => u.email === email)) {
-    return res.status(400).json({ error: "User already exists, please login" });
+    return res.status(400).json({ error: "User exists" });
   }
   users.push({ email, password, paid: false });
+  saveUsers();
   console.log('New user:', email);
   res.json({ message: "Registered successfully!" });
 });
@@ -33,19 +38,41 @@ app.post('/api/login', (req, res) => {
   res.json({ message: "Login success", paid: user.paid, email: user.email });
 });
 
-// PAYSTACK INITIALIZE - now it marks user as paid
+// INITIALIZE PAYSTACK
 app.post('/api/paystack/initialize', async (req, res) => {
   const { email, amount } = req.body;
   try {
-    const response = await axios.post('https://api.paystack.co/transaction/initialize', 
-      { email, amount: amount || 500000 },
+    const response = await axios.post('https://api.paystack.co/transaction/initialize',
+      { email, amount: amount || 500000 }, // 5000 Naira = 500000 kobo
       { headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` } }
     );
-    // Mark as paid after initialization (for test, in real life we go verify)
-    let user = users.find(u => u.email === email);
-    if(user) user.paid = true;
     console.log('Payment init for:', email);
-    res.json(response.data.data);
+    res.json(response.data.data); // contains authorization_url
+  } catch (error) {
+    console.error(error.response?.data || error.message);
+    res.status(500).json({ error: error.response?.data || error.message });
+  }
+});
+
+// VERIFY PAYSTACK - THIS IS WHERE INCOME IS CONFIRMED
+app.post('/api/paystack/verify', async (req, res) => {
+  const { reference, email } = req.body;
+  try {
+    const response = await axios.get(`https://api.paystack.co/transaction/verify/${reference}`,
+      { headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` } }
+    );
+    
+    if (response.data.data.status === 'success') {
+      let user = users.find(u => u.email === email);
+      if (user) {
+        user.paid = true;
+        saveUsers();
+        console.log('PAID SUCCESS:', email);
+      }
+      return res.json({ status: 'success', paid: true });
+    } else {
+      return res.json({ status: 'failed', paid: false });
+    }
   } catch (error) {
     console.error(error.response?.data || error.message);
     res.status(500).json({ error: error.response?.data || error.message });
@@ -54,6 +81,6 @@ app.post('/api/paystack/initialize', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`✅ Destyp-VPN backend running at http://localhost:${PORT}`);
-  console.log(`Users:`, users);
+  console.log(`Destyp-VPN backend running at http://localhost:${PORT}`);
+  console.log('Users:', users);
 });
